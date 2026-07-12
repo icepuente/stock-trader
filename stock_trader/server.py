@@ -21,6 +21,7 @@ from .config import Settings, apply_config, public_config, save_env
 from .gateway import GatewayManager
 from .indicators import add_indicators
 from .telegram import maybe_start_bridge
+from .updater import Updater
 
 NY = ZoneInfo("America/New_York")
 STATIC_DIR = Path(__file__).parent / "static"
@@ -119,6 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         runner.notifier = bridge["b"].send_event
     gateway = GatewayManager(settings)
     gateway.ensure()  # IBKR selected + gateway installed but not running -> launch it
+    updater = Updater(settings)
 
     app = FastAPI(title="stock_trader", docs_url="/docs")
     app.state.runner = runner
@@ -251,6 +253,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                  " — bot restarted" if restarted else "")
         return {"config": public_config(settings), "bot_restarted": restarted,
                 "saved": sorted(env_updates)}
+
+    @app.get("/api/update")
+    def update_check() -> dict:
+        return updater.check()
+
+    @app.post("/api/update")
+    def update_apply() -> dict:
+        return updater.update()
 
     @app.get("/api/gateway")
     def gateway_status() -> dict:

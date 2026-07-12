@@ -43,6 +43,13 @@ session window — with Bitget it simply runs every day, weekends included.
 
 Everything runs only on that computer; nothing is exposed to the internet.
 
+**Updates**: when new code lands on GitHub, an **⬆ Update** button appears in
+the dashboard header — one click downloads it, reinstalls anything needed and
+restarts the app by itself. (While this repo is private, paste a read-only
+GitHub token under ⚙ Settings → Updates so the updater can reach it.) Git
+checkouts update via `git pull --ff-only`; ZIP installs download the latest
+zipball and never touch `.env` or the environment.
+
 ## Setup (Mac/Linux, command line)
 
 ```bash

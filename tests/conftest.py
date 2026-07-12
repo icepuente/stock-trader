@@ -10,6 +10,7 @@ def clean_settings(**overrides) -> Settings:
         bitget_api_key="", bitget_secret_key="", bitget_passphrase="",
         telegram_bot_token="", telegram_chat_id="",
         live_trading=False,
+        update_repo="example/none", github_token="",
     )
     base.update(overrides)
     return Settings(**base)

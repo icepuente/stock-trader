@@ -66,6 +66,14 @@ class Settings:
         default_factory=lambda: float(os.environ.get("LIVE_ORDER_CAP_USD", "600"))
     )
 
+    # --- self-update from GitHub ---
+    update_repo: str = field(
+        default_factory=lambda: os.environ.get("UPDATE_REPO", "icepuente/stock-trader")
+    )
+    # Only needed while the repo is private: a fine-grained token with
+    # read-only Contents access lets the updater check and download code.
+    github_token: str = field(default_factory=lambda: os.environ.get("GITHUB_TOKEN", ""))
+
     # --- Telegram remote control + notifications (optional) ---
     # Token from @BotFather. Chat id optional: the first chat sending /start
     # binds itself; set TELEGRAM_CHAT_ID to pin it and lock out other chats.
@@ -198,6 +206,8 @@ CONFIG_FIELDS: dict[str, tuple[str, str, str]] = {
     "sim_symbols":        ("sim_symbols", "SIM_SYMBOLS", "csv"),
     "telegram_bot_token": ("telegram_bot_token", "TELEGRAM_BOT_TOKEN", "secret"),
     "telegram_chat_id":   ("telegram_chat_id", "TELEGRAM_CHAT_ID", "str"),
+    "update_repo":        ("update_repo", "UPDATE_REPO", "str"),
+    "github_token":       ("github_token", "GITHUB_TOKEN", "secret"),
     # REAL MONEY: enabling live_trading through the API additionally requires
     # live_confirm == "LIVE" — enforced in the /api/config endpoint.
     "live_trading":       ("live_trading", "LIVE_TRADING", "bool"),

@@ -56,7 +56,15 @@ echo  Starting Stock Trader... your browser will open in a moment.
 echo  Keep this black window open while you use it - closing it stops the bot.
 echo.
 start "" /min cmd /c "timeout /t 3 >nul && start http://127.0.0.1:8000"
+
+:run
 ".venv\Scripts\python.exe" main.py serve
+if %errorlevel%==42 (
+    echo.
+    echo  Update installed - restarting Stock Trader...
+    echo.
+    goto run
+)
 echo.
 echo Stock Trader stopped.
 pause

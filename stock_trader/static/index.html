@@ -153,6 +153,7 @@ details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-
   <span class="pill" id="nytime">— ET</span>
   <span class="pill" id="session"></span>
   <span class="spacer"></span>
+  <button id="updbtn" style="display:none" title="New version available">⬆ Update</button>
   <button id="cfgbtn" title="Provider &amp; Telegram settings">⚙ Settings</button>
   <button id="scanbtn">Scan now</button>
   <button id="botbtn" class="primary">Start bot</button>
@@ -245,6 +246,13 @@ details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-
       </div>
       <label>Replay symbols <input type="text" data-k="sim_symbols"></label>
     </div>
+
+    <h3>Updates</h3>
+    <label>GitHub repository <input type="text" data-k="update_repo"></label>
+    <label>GitHub token — only needed while the repo is private
+      <input type="password" data-k="github_token" autocomplete="off"></label>
+    <div class="hint">An <b>⬆ Update</b> button appears in the header whenever
+      new code is on GitHub; one click installs it and restarts the app.</div>
 
     <h3>Telegram (optional)</h3>
     <label>Bot token <input type="password" data-k="telegram_bot_token" autocomplete="off"></label>
@@ -729,6 +737,39 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") $("cfgoverlay").classList.remove("open");
 });
 
+// --------------------------------------------------------------- updates --
+async function checkUpdate() {
+  try {
+    const u = await api("/api/update");
+    const show = u.update_available && !u.updating;
+    $("updbtn").style.display = show ? "" : "none";
+    if (show) $("updbtn").title = "installed " + (u.local || "?").slice(0, 7) +
+                                  " → latest " + (u.remote || "?").slice(0, 7);
+  } catch (e) {}
+}
+
+$("updbtn").onclick = async () => {
+  if (!confirm("Install the latest version now?\n\nThe app restarts itself — this takes under a minute.")) return;
+  $("updbtn").disabled = true;
+  try { await api("/api/update", {method: "POST"}); }
+  catch (e) { showBanner("Update failed to start: " + e.message); $("updbtn").disabled = false; return; }
+  showBanner("Updating… the page reloads automatically when the app is back.");
+  const watch = setInterval(async () => {
+    try {
+      const u = await api("/api/update");
+      if (u.message && u.message.startsWith("update failed")) {
+        clearInterval(watch); showBanner(u.message); $("updbtn").disabled = false;
+      }
+    } catch (e) {           // server went down to restart — wait for it to return
+      clearInterval(watch);
+      const back = setInterval(async () => {
+        try { await api("/api/status"); clearInterval(back); location.reload(); }
+        catch (e2) {}
+      }, 1500);
+    }
+  }, 1500);
+};
+
 // -------------------------------------------------------------- controls --
 $("botbtn").onclick = async () => {
   let url = running ? "/api/bot/stop" : "/api/bot/start";
@@ -755,7 +796,8 @@ $("symbolinput").addEventListener("keydown", e => { if (e.key === "Enter") loadC
 window.addEventListener("resize", () => drawChart());
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawChart());
 
-refreshStatus(); refreshAccount(); refreshPositions(); refreshFeeds();
+refreshStatus(); refreshAccount(); refreshPositions(); refreshFeeds(); checkUpdate();
+setInterval(checkUpdate, 30 * 60 * 1000);
 const urlSym = new URLSearchParams(location.search).get("symbol");
 if (urlSym) loadChart(urlSym);
 setInterval(refreshStatus, 5000);
