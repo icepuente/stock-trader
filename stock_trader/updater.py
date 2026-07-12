@@ -89,6 +89,13 @@ class Updater:
         return vf.read_text().strip() if vf.exists() else None
 
     def remote_sha(self) -> str:
+        if self.is_git_checkout():
+            # use git's own credentials — works on private repos without a token
+            subprocess.run(["git", "fetch", "--quiet", "origin", "main"],
+                           cwd=self.root, capture_output=True, timeout=60, check=True)
+            out = subprocess.run(["git", "rev-parse", "origin/main"], cwd=self.root,
+                                 capture_output=True, text=True, timeout=10, check=True)
+            return out.stdout.strip()
         data = self._api(f"https://api.github.com/repos/{self.s.update_repo}/commits/main")
         return data["sha"]
 
