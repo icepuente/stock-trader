@@ -198,7 +198,19 @@ details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-
         <label>Port <input type="number" data-k="ibkr_port"></label>
       </div>
       <label>Client id <input type="number" data-k="ibkr_client_id"></label>
-      <div class="hint">Needs IB Gateway/TWS running locally. Paper ports: 4002 Gateway / 7497 TWS. Live ports: 4001 Gateway / 7496 TWS.</div>
+      <div class="hint">Paper ports: 4002 Gateway / 7497 TWS. Live ports: 4001 Gateway / 7496 TWS.</div>
+
+      <h3>IB Gateway</h3>
+      <div class="hint" id="gwstatus">checking…</div>
+      <div style="display:flex; gap:8px; margin-top:6px">
+        <button type="button" id="gwinstall" style="display:none">Install IB Gateway</button>
+        <button type="button" id="gwstart" style="display:none">Start IB Gateway</button>
+      </div>
+      <div class="hint">The gateway starts automatically with the server when
+        IBKR is the provider, but <b>logging in stays manual</b> (IBKR requires
+        it): in its window pick <b>IB API</b>, log in with your paper username
+        (DU…), then under Configure → Settings → API → Settings tick
+        <b>Enable ActiveX and Socket Clients</b> and untick <b>Read-Only API</b>.</div>
 
       <div class="livebox" id="livebox">
         <label class="checkline" style="margin-top:0">
@@ -609,7 +621,40 @@ function syncSections() {
   const p = $("cfg_provider").value;
   document.querySelectorAll(".cfgsec[data-p]").forEach(d =>
     d.classList.toggle("show", d.dataset.p === p));
+  if (p === "ibkr") refreshGateway();
 }
+
+async function refreshGateway() {
+  try {
+    const g = await api("/api/gateway");
+    $("gwstatus").innerHTML = g.running
+      ? '<span class="pl-up">●</span> running — API port ' + g.port + " is open"
+      : g.installing
+      ? "⏳ " + escHtml(g.install_message || "installing…")
+      : g.installed
+      ? '<span class="pl-down">●</span> installed but not running (port ' + g.port + ' closed) — start it and log in'
+      : '<span class="pl-down">●</span> not installed';
+    $("gwinstall").style.display = (!g.installed && !g.installing) ? "" : "none";
+    $("gwstart").style.display = (g.installed && !g.running) ? "" : "none";
+    if (g.installing && $("cfgoverlay").classList.contains("open"))
+      setTimeout(refreshGateway, 2500);
+  } catch (e) { $("gwstatus").textContent = "gateway status unavailable: " + e.message; }
+}
+
+$("gwinstall").onclick = async () => {
+  $("gwinstall").disabled = true;
+  try { const r = await api("/api/gateway/install", {method: "POST"});
+        $("gwstatus").textContent = r.message; } catch (e) { $("gwstatus").textContent = e.message; }
+  $("gwinstall").disabled = false;
+  setTimeout(refreshGateway, 1500);
+};
+$("gwstart").onclick = async () => {
+  $("gwstart").disabled = true;
+  try { const r = await api("/api/gateway/start", {method: "POST"});
+        $("gwstatus").textContent = r.message; } catch (e) { $("gwstatus").textContent = e.message; }
+  $("gwstart").disabled = false;
+  setTimeout(refreshGateway, 4000);
+};
 
 async function openSettings() {
   $("cfgerr").textContent = "";

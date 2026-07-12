@@ -57,13 +57,20 @@ cp .env.example .env   # optional — ⚙ Settings in the dashboard writes it to
   bitget.com to **Demo Trading** mode first, then create the key *inside*
   the demo environment — set `PROVIDER=bitget` (and `BITGET_UTA=1` for
   Unified Account mode)
-- IBKR: no API keys — install [IB Gateway](https://www.interactivebrokers.com/en/trading/ibgateway-stable.php)
-  (or TWS), log in with your **paper** account (username starts with `DU`),
-  enable API connections (Configuration → API → Settings → "Enable ActiveX
-  and Socket Clients", untick "Read-Only API") — set `PROVIDER=ibkr`. The
-  bot checks the connected account code and refuses live logins. Without
-  paid market-data subscriptions IBKR serves 15-min-delayed data, which
-  shifts every signal — Alpaca's free feed is real-time. IBKR request
+- IBKR: no API keys. Pick the IBKR provider in ⚙ Settings — the panel shows
+  the gateway state with **Install IB Gateway** (downloads IBKR's official
+  installer and, on Windows, installs it silently) and **Start IB Gateway**
+  buttons. Whenever the server or bot starts with IBKR selected, the gateway
+  is launched automatically if it isn't already running. **Logging in stays
+  manual** — IBKR requires it (plus two-factor on live accounts): in the
+  gateway window pick *IB API* (not FIX CTCI), log in with your **paper**
+  account (username starts with `DU`), then under Configure → Settings →
+  API → Settings enable "ActiveX and Socket Clients" and untick "Read-Only
+  API". The gateway restarts itself daily (Lock and Exit → set Auto restart
+  to stay logged in through the week). The bot checks the connected account
+  code and refuses live logins unless live mode is explicitly enabled.
+  Without paid market-data subscriptions IBKR serves 15-min-delayed data,
+  which shifts every signal — Alpaca's free feed is real-time. IBKR request
   pacing is respected via a 4-minute bars cache per symbol.
 
 ## Run

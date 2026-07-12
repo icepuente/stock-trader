@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from .bot import Bot
 from .config import Settings, apply_config, public_config, save_env
+from .gateway import GatewayManager
 from .indicators import add_indicators
 from .telegram import maybe_start_bridge
 
@@ -116,6 +117,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     bridge: dict = {"b": maybe_start_bridge(settings, runner)}
     if bridge["b"]:
         runner.notifier = bridge["b"].send_event
+    gateway = GatewayManager(settings)
+    gateway.ensure()  # IBKR selected + gateway installed but not running -> launch it
 
     app = FastAPI(title="stock_trader", docs_url="/docs")
     app.state.runner = runner
@@ -144,6 +147,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                      else {"bitget": "DEMO", "sim": "SIM"}.get(settings.provider, "PAPER")),
             "live": settings.live_active(),
             "telegram": bridge["b"] is not None,
+            "gateway": gateway.status() if settings.provider == "ibkr" else None,
             "watchlist": [],
             "states": {},
             "market": None,
@@ -176,6 +180,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detail="LIVE trading is enabled — real money. Repeat the "
                        "request with ?confirm=LIVE to start the bot.",
             )
+        if settings.provider == "ibkr":
+            gateway.ensure()
         runner.start()
         return {"running": runner.running}
 
@@ -233,6 +239,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 bridge["b"].chat_id = bound
             runner.notifier = bridge["b"].send_event if bridge["b"] else None
 
+        if settings.provider == "ibkr":
+            gateway.ensure()  # switching to IBKR: bring the gateway up too
+
         restarted = False
         if was_running and settings.has_keys():
             runner.start()
@@ -242,6 +251,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                  " — bot restarted" if restarted else "")
         return {"config": public_config(settings), "bot_restarted": restarted,
                 "saved": sorted(env_updates)}
+
+    @app.get("/api/gateway")
+    def gateway_status() -> dict:
+        return gateway.status()
+
+    @app.post("/api/gateway/start")
+    def gateway_start() -> dict:
+        return gateway.start()
+
+    @app.post("/api/gateway/install")
+    def gateway_install() -> dict:
+        return gateway.install()
 
     @app.get("/api/account")
     def account() -> dict:
