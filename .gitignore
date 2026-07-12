@@ -1,0 +1,12 @@
+# secrets — NEVER commit API keys or Telegram tokens
+.env
+
+# virtual environment & caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# editor/OS noise
+.DS_Store
+.claude/

@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stock_trader — paper bot</title>
+<style>
+:root {
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --up: #0ca30c; --down: #d03b3b; --up-text: #006300; --down-text: #d03b3b;
+  --ema9: #2a78d6; --ema20: #eda100;
+  --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --up: #0ca30c; --down: #d03b3b; --up-text: #0ca30c; --down-text: #d03b3b;
+    --ema9: #3987e5; --ema20: #c98500;
+    --accent: #3987e5;
+  }
+}
+* { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 16px; max-width: 1280px; margin: 0 auto;
+}
+h1 { font-size: 17px; font-weight: 650; }
+h2 { font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); }
+.badge.paper { color: var(--up-text); border-color: var(--up-text); }
+.badge.live { color: #fff; background: var(--down); border-color: var(--down); animation: livepulse 2s ease-in-out infinite; }
+@keyframes livepulse { 50% { opacity: .65; } }
+.pill { font-size: 12px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.open { background: var(--up); }
+.dot.run  { background: var(--up); }
+.spacer { flex: 1; }
+button {
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text] {
+  font: inherit; font-size: 13px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 170px;
+  text-transform: uppercase;
+}
+.banner {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--down);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; color: var(--ink-2); display: none;
+}
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.tile .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tile .value { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .value.up { color: var(--up-text); } .tile .value.down { color: var(--down-text); }
+.layout { display: grid; grid-template-columns: 380px 1fr; gap: 14px; align-items: start; }
+@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 4px 8px 6px 0; border-bottom: 1px solid var(--grid); }
+td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--grid); color: var(--ink-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: none; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { color: var(--ink); background: color-mix(in srgb, var(--grid) 35%, transparent); }
+td:first-child, th:first-child { padding-left: 4px; }
+td .sym { color: var(--ink); font-weight: 600; }
+.pl-up { color: var(--up-text); } .pl-down { color: var(--down-text); }
+.tierchips span {
+  display: inline-block; font-size: 10px; font-weight: 700; border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 5px; margin-right: 3px; color: var(--muted);
+}
+.tierchips span.on { color: var(--up-text); border-color: var(--up-text); }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 0; text-align: center; }
+.log {
+  height: 240px; max-height: 70vh; overflow-y: auto; resize: vertical;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-top: 1px solid var(--grid); padding-top: 6px;
+}
+.log .entry { display: flex; gap: 8px; padding: 2px 0; align-items: baseline; }
+.log .entry + .entry { border-top: 1px solid color-mix(in srgb, var(--grid) 45%, transparent); }
+.log .t { color: var(--muted); flex: 0 0 62px; }
+.log .msg { flex: 1; min-width: 0; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.log .buy { color: var(--up-text); font-weight: 600; } .log .sell { color: var(--down-text); font-weight: 600; }
+.log .lvl-WARNING { color: var(--ema20); font-weight: 600; margin-right: 6px; }
+.log .lvl-ERROR { color: var(--down-text); font-weight: 600; margin-right: 6px; }
+.chart-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+#chartwrap { position: relative; }
+#chart { width: 100%; display: block; }
+#tooltip {
+  position: absolute; pointer-events: none; display: none; z-index: 5;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12px;
+  color: var(--ink-2); min-width: 150px;
+}
+#tooltip .tt-t { color: var(--ink); font-weight: 600; margin-bottom: 3px; }
+#tooltip .row { display: flex; justify-content: space-between; gap: 14px; }
+#tooltip .row b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.overlay {
+  position: fixed; inset: 0; z-index: 20; display: none;
+  background: rgba(0,0,0,.45); padding: 40px 16px; overflow-y: auto;
+}
+.overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px 20px; width: min(500px, 100%); box-shadow: 0 12px 40px rgba(0,0,0,.3);
+}
+.modal h3 { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 2px; }
+.modal label { display: block; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.modal input[type=text], .modal input[type=password], .modal input[type=number], .modal select {
+  width: 100%; text-transform: none; font: inherit; font-size: 13px;
+  background: var(--page); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; margin-top: 3px;
+}
+.modal .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.modal .checkline { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.modal .checkline input { width: auto; margin: 0; }
+.modal .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.modal .actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.modal .err { color: var(--down-text); font-size: 12px; flex: 1; }
+.cfgsec { display: none; }
+.cfgsec.show { display: block; }
+.livebox {
+  border: 1px solid var(--down); border-radius: 8px;
+  padding: 10px 12px; margin-top: 12px;
+  background: color-mix(in srgb, var(--down) 7%, transparent);
+}
+.livebox.armed { background: color-mix(in srgb, var(--down) 16%, transparent); }
+.livebox .title { font-size: 12px; font-weight: 700; color: var(--down-text); }
+.livebox ul { margin: 6px 0 0 18px; font-size: 11px; color: var(--ink-2); }
+.paneltitle { font-size: 10px; fill: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>stock_trader</h1>
+  <span class="badge paper" id="modebadge">PAPER</span>
+  <span class="pill"><span id="mktdot" class="dot"></span><span id="mkt">market —</span></span>
+  <span class="pill" id="nytime">— ET</span>
+  <span class="pill" id="session"></span>
+  <span class="spacer"></span>
+  <button id="cfgbtn" title="Provider &amp; Telegram settings">⚙ Settings</button>
+  <button id="scanbtn">Scan now</button>
+  <button id="botbtn" class="primary">Start bot</button>
+</header>
+
+<div class="overlay" id="cfgoverlay">
+  <div class="modal">
+    <h2>Settings</h2>
+    <div class="hint">Saved to <code>.env</code> and applied immediately — the
+      bot is rebuilt on the new provider (and restarted if it was running).</div>
+
+    <label>Provider
+      <select id="cfg_provider" data-k="provider">
+        <option value="sim">Simulation — replay / demo, no keys needed</option>
+        <option value="alpaca">Alpaca — US shares, paper account</option>
+        <option value="ibkr">Interactive Brokers — US shares, paper (IB Gateway)</option>
+        <option value="bitget">Bitget — crypto, demo trading</option>
+      </select>
+    </label>
+
+    <div class="cfgsec" data-p="alpaca">
+      <h3>Alpaca (paper)</h3>
+      <label>API key <input type="password" data-k="alpaca_api_key" autocomplete="off"></label>
+      <label>Secret key <input type="password" data-k="alpaca_secret_key" autocomplete="off"></label>
+      <div class="hint">Paper keys from app.alpaca.markets → Paper dashboard. Leave blank to keep the saved value, enter “-” to clear.</div>
+    </div>
+
+    <div class="cfgsec" data-p="bitget">
+      <h3>Bitget (demo)</h3>
+      <label>API key <input type="password" data-k="bitget_api_key" autocomplete="off"></label>
+      <label>Secret key <input type="password" data-k="bitget_secret_key" autocomplete="off"></label>
+      <label>Passphrase <input type="password" data-k="bitget_passphrase" autocomplete="off"></label>
+      <label class="checkline"><input type="checkbox" data-k="bitget_uta"> Unified Account (UTA) mode</label>
+      <label>Symbols (comma-separated, blank = auto-detect)
+        <input type="text" data-k="bitget_symbols" placeholder="BTC/USDT:USDT,ETH/USDT:USDT"></label>
+      <div class="hint">Keys must be created <b>inside</b> Demo Trading mode on bitget.com. Blank keeps the saved value, “-” clears.</div>
+    </div>
+
+    <div class="cfgsec" data-p="ibkr">
+      <h3>Interactive Brokers (paper)</h3>
+      <div class="grid2">
+        <label>Gateway host <input type="text" data-k="ibkr_host"></label>
+        <label>Port <input type="number" data-k="ibkr_port"></label>
+      </div>
+      <label>Client id <input type="number" data-k="ibkr_client_id"></label>
+      <div class="hint">Needs IB Gateway/TWS running locally. Paper ports: 4002 Gateway / 7497 TWS. Live ports: 4001 Gateway / 7496 TWS.</div>
+
+      <div class="livebox" id="livebox">
+        <label class="checkline" style="margin-top:0">
+          <input type="checkbox" data-k="live_trading" id="cfg_live">
+          <span class="title">Enable LIVE trading — real money</span>
+        </label>
+        <ul>
+          <li>This strategy is <b>unvalidated</b> on real market data — it may simply lose money.</li>
+          <li>Unattended <b>market orders</b> on your real IBKR account, up to 3 symbols at once.</li>
+          <li>Only takes effect once IB Gateway is logged into your <b>live</b> account (U…) — a paper login keeps trading paper.</li>
+          <li>Starting the bot will ask you to type <code>LIVE</code> again, every time.</li>
+        </ul>
+        <div class="grid2">
+          <label>Per-symbol allocation $ <input type="number" data-k="live_allocation_usd" min="1"></label>
+          <label>Daily-loss halt $ <input type="number" data-k="live_max_daily_loss_usd" min="1"></label>
+        </div>
+        <label>Per-order cap $ <input type="number" data-k="live_order_cap_usd" min="1"></label>
+        <div class="hint">The daily-loss halt flattens everything and stops the bot for the day. Saving with the box newly ticked asks you to type <code>LIVE</code> — enforced by the server, and Telegram can never toggle this.</div>
+      </div>
+    </div>
+
+    <div class="cfgsec" data-p="sim">
+      <h3>Simulation</h3>
+      <div class="grid2">
+        <label>Scenario
+          <select data-k="sim_scenario">
+            <option value="replay">replay — last real trading day</option>
+            <option value="demo">demo — guaranteed trades</option>
+          </select>
+        </label>
+        <label>Speed (× real time) <input type="number" data-k="sim_speed" min="1" step="1"></label>
+      </div>
+      <label>Replay symbols <input type="text" data-k="sim_symbols"></label>
+    </div>
+
+    <h3>Telegram (optional)</h3>
+    <label>Bot token <input type="password" data-k="telegram_bot_token" autocomplete="off"></label>
+    <label>Chat id (blank = first /start binds) <input type="text" data-k="telegram_chat_id" style="text-transform:none"></label>
+    <div class="hint">Token from @BotFather. Blank keeps the saved token, “-” clears it (disables Telegram).</div>
+
+    <div class="actions">
+      <span class="err" id="cfgerr"></span>
+      <button id="cfgcancel">Cancel</button>
+      <button id="cfgsave" class="primary">Save &amp; apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<div class="tiles">
+  <div class="tile"><div class="label">Equity</div><div class="value" id="equity">—</div></div>
+  <div class="tile"><div class="label">Day P&amp;L</div><div class="value" id="daypl">—</div></div>
+  <div class="tile"><div class="label">Cash</div><div class="value" id="cash">—</div></div>
+  <div class="tile"><div class="label">Buying power</div><div class="value" id="bp">—</div></div>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="card">
+      <h2>Watchlist &amp; signals</h2>
+      <table id="watchlist">
+        <thead><tr><th>Symbol</th><th>Gate</th><th>Tiers</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="watchempty">No symbols yet — start the bot or hit “Scan now” during market hours.</div>
+    </div>
+
+    <div class="card">
+      <h2>Open positions</h2>
+      <table id="positions">
+        <thead><tr><th>Symbol</th><th class="num">Qty</th><th class="num">Entry</th><th class="num">Price</th><th class="num">P&amp;L</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="posempty">No open positions.</div>
+    </div>
+
+    <div class="card">
+      <h2>Activity</h2>
+      <div class="log" id="activity"><div class="empty">No trades yet.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Log</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chart-head">
+      <h2 style="margin:0">Chart</h2>
+      <input type="text" id="symbolinput" placeholder="AAPL" spellcheck="false">
+      <button id="loadbtn">Load</button>
+      <span class="spacer"></span>
+      <span class="legend">
+        <span><i style="background:var(--ema9)"></i>EMA 9</span>
+        <span><i style="background:var(--ema20)"></i>EMA 20</span>
+      </span>
+    </div>
+    <div id="chartwrap">
+      <svg id="chart"></svg>
+      <div id="tooltip"></div>
+    </div>
+    <div class="empty" id="chartempty">Enter a symbol (or click a watchlist row) to see hourly candles, EMA 9/20, volume and the MACD histogram.</div>
+    <details id="tablewrap" style="display:none">
+      <summary>Data table (last 12 bars)</summary>
+      <table id="barstable">
+        <thead><tr><th>Time</th><th class="num">Open</th><th class="num">High</th><th class="num">Low</th><th class="num">Close</th><th class="num">Volume</th><th class="num">EMA9</th><th class="num">EMA20</th><th class="num">MACD hist</th><th class="num">VMAR</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const fmt$ = v => (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+const fmt2 = v => v == null ? "—" : Number(v).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtVol = v => v >= 1e6 ? (v/1e6).toFixed(1) + "M" : v >= 1e3 ? (v/1e3).toFixed(0) + "k" : String(v);
+const cssvar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+let running = false, liveMode = false, chartSymbol = null, chartData = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+// ---------------------------------------------------------------- status --
+async function refreshStatus() {
+  try {
+    const s = await api("/api/status");
+    $("nytime").textContent = s.ny_time + " ET";
+    $("session").textContent = "session " + s.session;
+    liveMode = !!s.live;
+    $("modebadge").textContent = (liveMode ? "⚠ LIVE — REAL MONEY" : s.mode) + " · " + s.provider.toUpperCase();
+    $("modebadge").className = "badge " + (liveMode ? "live" : "paper");
+    if (!s.keys_configured) {
+      showBanner(s.provider + " keys not configured — open ⚙ Settings to add them (or edit .env).");
+      $("botbtn").disabled = true; $("scanbtn").disabled = true;
+      return;
+    }
+    $("botbtn").disabled = false; $("scanbtn").disabled = false;
+    if (s.error) { showBanner(s.provider + " error: " + s.error); return; }
+    hideBanner();
+    if (s.market) {
+      $("mkt").textContent = s.market.next_close === "24/7" ? "market open 24/7"
+        : s.market.is_open ? "market open · closes " + s.market.next_close
+                           : "market closed · opens " + s.market.next_open;
+      $("mktdot").className = "dot" + (s.market.is_open ? " open" : "");
+    }
+    running = s.running;
+    $("botbtn").textContent = running ? "Stop bot" : "Start bot";
+    $("botbtn").className = running ? "" : "primary";
+    renderWatchlist(s.watchlist, s.states);
+    if (!chartSymbol && s.watchlist.length) loadChart(s.watchlist[0]);
+  } catch (e) { showBanner("Server unreachable: " + e.message); }
+}
+
+function showBanner(msg) { const b = $("banner"); b.textContent = msg; b.style.display = "block"; }
+function hideBanner() { $("banner").style.display = "none"; }
+
+function renderWatchlist(symbols, states) {
+  const tb = $("watchlist").querySelector("tbody");
+  tb.innerHTML = "";
+  $("watchempty").style.display = symbols.length ? "none" : "block";
+  for (const sym of symbols) {
+    const st = states[sym] || {};
+    const tierHelp = {
+      A: "Tier A (30%): MACD histogram green & rising in an uptrend with volume momentum",
+      B: "Tier B (50%): candle 2 closed full-body green with rising histogram and volume",
+      C: "Tier C (20%): candle 3 opening with volume up and histogram rising",
+    };
+    const tiers = ["A", "B", "C"].map(t =>
+      `<span title="${tierHelp[t]}" class="${(st.tiers_filled || []).includes(t) ? "on" : ""}">${t}</span>`).join("");
+    const status = st.done_for_day ? "done for day"
+                 : st.partial_exit_done ? "partial exit taken"
+                 : st.gate_passed ? "gate passed" : "watching";
+    const tr = document.createElement("tr");
+    tr.className = "clickable";
+    tr.innerHTML = `<td><span class="sym">${sym}</span></td>
+      <td title="Entry gate: candle 2 green with volume above candle 1">${
+        st.gate_passed ? '<span class="pl-up">✓</span>' : "·"}</td>
+      <td class="tierchips">${tiers}</td><td>${status}</td>`;
+    tr.onclick = () => loadChart(sym);
+    tb.appendChild(tr);
+  }
+}
+
+async function refreshAccount() {
+  try {
+    const a = await api("/api/account");
+    $("equity").textContent = fmt$(a.equity);
+    $("cash").textContent = fmt$(a.cash);
+    $("bp").textContent = fmt$(a.buying_power);
+    const d = $("daypl");
+    if (a.day_pl == null) { d.textContent = "—"; d.className = "value"; }
+    else {
+      d.textContent = (a.day_pl >= 0 ? "+" : "") + fmt$(a.day_pl);
+      d.className = "value " + (a.day_pl >= 0 ? "up" : "down");
+    }
+  } catch (e) { /* keys missing or network — banner already shown */ }
+}
+
+async function refreshPositions() {
+  try {
+    const ps = await api("/api/positions");
+    const tb = $("positions").querySelector("tbody");
+    tb.innerHTML = "";
+    $("posempty").style.display = ps.length ? "none" : "block";
+    for (const p of ps) {
+      const cls = p.unrealized_pl >= 0 ? "pl-up" : "pl-down";
+      const tr = document.createElement("tr");
+      tr.className = "clickable";
+      tr.innerHTML = `<td><span class="sym">${p.symbol}</span></td>
+        <td class="num">${p.qty}</td><td class="num">${fmt2(p.avg_entry)}</td>
+        <td class="num">${fmt2(p.price)}</td>
+        <td class="num ${cls}">${fmt2(p.unrealized_pl)} (${(p.unrealized_plpc*100).toFixed(1)}%)</td>`;
+      tr.onclick = () => loadChart(p.symbol);
+      tb.appendChild(tr);
+    }
+  } catch (e) {}
+}
+
+const escHtml = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+async function refreshFeeds() {
+  try {
+    const acts = await api("/api/activity");
+    if (acts.length) $("activity").innerHTML = acts.map(a =>
+      `<div class="entry"><span class="t">${a.time}</span>` +
+      `<span class="msg"><span class="${a.side}">${a.side.toUpperCase()}</span> ` +
+      `${escHtml(a.symbol)} — ${escHtml(a.detail)}</span></div>`).join("");
+    const logs = await api("/api/logs");
+    $("log").innerHTML = logs.map(l =>
+      `<div class="entry"><span class="t">${l.time}</span><span class="msg">` +
+      (l.level !== "INFO" ? `<span class="lvl-${l.level}">${l.level}</span>` : "") +
+      `${escHtml(l.message)}</span></div>`).join("");
+  } catch (e) {}
+}
+
+// ----------------------------------------------------------------- chart --
+async function loadChart(sym) {
+  sym = (sym || "").trim().toUpperCase();
+  if (!sym) return;
+  chartSymbol = sym;
+  $("symbolinput").value = sym;
+  try {
+    chartData = await api("/api/bars/" + sym.split("/").map(encodeURIComponent).join("/"));
+    $("chartempty").style.display = "none";
+    $("tablewrap").style.display = "block";
+    drawChart();
+    renderBarsTable();
+  } catch (e) {
+    chartData = null;
+    $("chartempty").style.display = "block";
+    $("chartempty").textContent = `Could not load ${sym}: ${e.message}`;
+    $("tablewrap").style.display = "none";
+    $("chart").innerHTML = "";
+  }
+}
+
+function renderBarsTable() {
+  const tb = $("barstable").querySelector("tbody");
+  tb.innerHTML = chartData.bars.slice(-12).map(b => `<tr>
+    <td>${b.t}</td><td class="num">${fmt2(b.o)}</td><td class="num">${fmt2(b.h)}</td>
+    <td class="num">${fmt2(b.l)}</td><td class="num">${fmt2(b.c)}</td>
+    <td class="num">${fmtVol(b.v)}</td><td class="num">${fmt2(b.ema9)}</td>
+    <td class="num">${fmt2(b.ema20)}</td><td class="num">${b.hist == null ? "—" : b.hist.toFixed(3)}</td>
+    <td class="num">${b.vmar == null ? "—" : b.vmar.toFixed(2)}</td></tr>`).join("");
+}
+
+const M = {top: 18, right: 56, bottom: 6, left: 8};
+const PANELS = {price: 250, vol: 64, macd: 64, gap: 30};
+
+function drawChart() {
+  if (!chartData) return;
+  const bars = chartData.bars;
+  const svg = $("chart");
+  const W = svg.parentElement.clientWidth;
+  const H = M.top + PANELS.price + PANELS.gap + PANELS.vol + PANELS.gap + PANELS.macd + M.bottom;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("height", H);
+
+  const plotW = W - M.left - M.right;
+  const n = bars.length;
+  const slot = plotW / n;
+  const bw = Math.max(2, Math.min(9, slot - 2));   // ≥2px gap between candles
+  const xC = i => M.left + slot * (i + 0.5);
+
+  const yTop = {price: M.top, vol: M.top + PANELS.price + PANELS.gap,
+                macd: M.top + PANELS.price + PANELS.gap + PANELS.vol + PANELS.gap};
+
+  // scales
+  const lows = bars.map(b => b.l), highs = bars.map(b => b.h);
+  const emaVals = bars.flatMap(b => [b.ema9, b.ema20]).filter(v => v != null);
+  let pMin = Math.min(...lows, ...emaVals), pMax = Math.max(...highs, ...emaVals);
+  const pad = (pMax - pMin) * 0.06 || 1; pMin -= pad; pMax += pad;
+  const yP = v => yTop.price + PANELS.price * (1 - (v - pMin) / (pMax - pMin));
+  const vMax = Math.max(...bars.map(b => b.v)) || 1;
+  const yV = v => yTop.vol + PANELS.vol * (1 - v / vMax);
+  const hVals = bars.map(b => b.hist ?? 0);
+  const hAbs = Math.max(...hVals.map(Math.abs)) || 1;
+  const yH = v => yTop.macd + PANELS.macd * (0.5 - v / (2 * hAbs));
+
+  const up = cssvar("--up"), down = cssvar("--down"), gridC = cssvar("--grid"),
+        base = cssvar("--baseline"), mut = cssvar("--muted"),
+        ema9C = cssvar("--ema9"), ema20C = cssvar("--ema20");
+  let s = "";
+  const esc = t => String(t);
+
+  // panel titles
+  const title = (t, y) => `<text class="paneltitle" x="${M.left}" y="${y - 6}">${t}</text>`;
+  s += title(chartData.symbol + " · 1h candles", yTop.price);
+  s += title("Volume", yTop.vol);
+  s += title("MACD histogram", yTop.macd);
+
+  // horizontal gridlines + right-edge labels (price panel)
+  for (let k = 0; k <= 4; k++) {
+    const v = pMin + (pMax - pMin) * k / 4, y = yP(v);
+    s += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" stroke="${gridC}" stroke-width="1"/>`;
+    s += `<text x="${W - M.right + 6}" y="${y + 3}" font-size="10" fill="${mut}">${fmt2(v)}</text>`;
+  }
+  // day separators + date labels
+  for (let i = 1; i < n; i++) if (bars[i].day !== bars[i - 1].day) {
+    const x = M.left + slot * i;
+    s += `<line x1="${x}" x2="${x}" y1="${yTop.price}" y2="${yTop.macd + PANELS.macd}" stroke="${gridC}" stroke-width="1" stroke-dasharray="2,3"/>`;
+    s += `<text x="${x + 3}" y="${yTop.price + PANELS.price + 12}" font-size="10" fill="${mut}">${esc(bars[i].day)}</text>`;
+  }
+
+  // candles + volume + macd
+  for (let i = 0; i < n; i++) {
+    const b = bars[i], green = b.c >= b.o, col = green ? up : down, x = xC(i);
+    s += `<line x1="${x}" x2="${x}" y1="${yP(b.h)}" y2="${yP(b.l)}" stroke="${col}" stroke-width="1"/>`;
+    const bt = yP(Math.max(b.o, b.c)), bh = Math.max(1, Math.abs(yP(b.o) - yP(b.c)));
+    s += `<rect x="${x - bw/2}" y="${bt}" width="${bw}" height="${bh}" fill="${col}" rx="1"/>`;
+    s += `<rect x="${x - bw/2}" y="${yV(b.v)}" width="${bw}" height="${yTop.vol + PANELS.vol - yV(b.v)}" fill="${col}" opacity="0.45" rx="1"/>`;
+    if (b.hist != null) {
+      const y0 = yH(0), y1 = yH(b.hist);
+      s += `<rect x="${x - bw/2}" y="${Math.min(y0, y1)}" width="${bw}" height="${Math.max(1, Math.abs(y1 - y0))}" fill="${b.hist >= 0 ? up : down}" rx="1"/>`;
+    }
+  }
+  // baselines
+  s += `<line x1="${M.left}" x2="${W - M.right}" y1="${yTop.vol + PANELS.vol}" y2="${yTop.vol + PANELS.vol}" stroke="${base}" stroke-width="1"/>`;
+  s += `<line x1="${M.left}" x2="${W - M.right}" y1="${yH(0)}" y2="${yH(0)}" stroke="${base}" stroke-width="1"/>`;
+
+  // EMA lines (2px) + direct labels at the right end (ink text, colored tick)
+  const line = (key, col) => {
+    const pts = bars.map((b, i) => b[key] == null ? null : `${xC(i)},${yP(b[key])}`)
+                    .filter(Boolean).join(" ");
+    return `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+  };
+  s += line("ema9", ema9C) + line("ema20", ema20C);
+  // direct labels inside the plot, nudged apart if the lines end close together
+  const lastB = bars[n - 1];
+  if (lastB.ema9 != null && lastB.ema20 != null) {
+    let y9 = yP(lastB.ema9), y20 = yP(lastB.ema20);
+    if (Math.abs(y9 - y20) < 14) {
+      const mid = (y9 + y20) / 2, sign = y9 <= y20 ? 1 : -1;
+      y9 = mid - 7 * sign; y20 = mid + 7 * sign;
+    }
+    const lbl = (name, col, y) =>
+      `<rect x="${W - M.right - 52}" y="${y - 9}" width="10" height="3" rx="1.5" fill="${col}"/>` +
+      `<text x="${W - M.right - 38}" y="${y - 2}" font-size="10" fill="${mut}">${name}</text>`;
+    s += lbl("EMA 9", ema9C, y9) + lbl("EMA 20", ema20C, y20);
+  }
+
+  // crosshair placeholder
+  s += `<line id="xhair" x1="0" x2="0" y1="${yTop.price}" y2="${yTop.macd + PANELS.macd}" stroke="${base}" stroke-width="1" visibility="hidden"/>`;
+  s += `<rect id="hitzone" x="${M.left}" y="0" width="${plotW}" height="${H}" fill="transparent"/>`;
+
+  svg.innerHTML = s;
+
+  // hover: nearest bar → crosshair + tooltip
+  const tt = $("tooltip"), xh = svg.querySelector("#xhair");
+  const hit = svg.querySelector("#hitzone");
+  hit.addEventListener("mousemove", ev => {
+    const rect = svg.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * (W / rect.width);
+    const i = Math.max(0, Math.min(n - 1, Math.floor((x - M.left) / slot)));
+    const b = bars[i], cx = xC(i);
+    xh.setAttribute("x1", cx); xh.setAttribute("x2", cx);
+    xh.setAttribute("visibility", "visible");
+    tt.innerHTML = `<div class="tt-t">${b.t} · candle ${b.n}</div>` +
+      [["Open", fmt2(b.o)], ["High", fmt2(b.h)], ["Low", fmt2(b.l)], ["Close", fmt2(b.c)],
+       ["Volume", fmtVol(b.v)], ["EMA 9", fmt2(b.ema9)], ["EMA 20", fmt2(b.ema20)],
+       ["MACD hist", b.hist == null ? "—" : b.hist.toFixed(3)],
+       ["VMAR", b.vmar == null ? "—" : b.vmar.toFixed(2)]]
+      .map(([k, v]) => `<div class="row"><span>${k}</span><b>${v}</b></div>`).join("");
+    tt.style.display = "block";
+    const wrapRect = $("chartwrap").getBoundingClientRect();
+    const px = (cx / W) * rect.width;
+    tt.style.left = Math.min(px + 14, wrapRect.width - tt.offsetWidth - 4) + "px";
+    tt.style.top = (ev.clientY - wrapRect.top + 14) + "px";
+  });
+  hit.addEventListener("mouseleave", () => {
+    tt.style.display = "none"; xh.setAttribute("visibility", "hidden");
+  });
+}
+
+// -------------------------------------------------------------- settings --
+const cfgEls = () => document.querySelectorAll("#cfgoverlay [data-k]");
+let cfgWasLive = false;
+
+function syncSections() {
+  const p = $("cfg_provider").value;
+  document.querySelectorAll(".cfgsec[data-p]").forEach(d =>
+    d.classList.toggle("show", d.dataset.p === p));
+}
+
+async function openSettings() {
+  $("cfgerr").textContent = "";
+  try {
+    const c = await api("/api/config");
+    cfgEls().forEach(el => {
+      const k = el.dataset.k;
+      if (el.type === "checkbox") el.checked = !!c[k];
+      else if (el.type === "password") {
+        el.value = "";
+        el.placeholder = c[k] ? c[k] + " (saved)" : "not set";
+      } else el.value = c[k] ?? "";
+    });
+    syncSections();
+    cfgWasLive = !!c.live_trading;
+    $("livebox").classList.toggle("armed", $("cfg_live").checked);
+    $("cfgoverlay").classList.add("open");
+  } catch (e) { showBanner("Could not load settings: " + e.message); }
+}
+
+async function saveSettings() {
+  const body = {};
+  cfgEls().forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === "checkbox") body[k] = el.checked;
+    else if (el.type === "password") { if (el.value.trim()) body[k] = el.value.trim(); }
+    else body[k] = el.value.trim();
+  });
+  if (body.live_trading && !cfgWasLive) {
+    const t = prompt(
+      "⚠️ ENABLE LIVE TRADING?\n\n" +
+      "This bot will place REAL-MONEY market orders on your IBKR account, " +
+      "unattended, with a strategy that has never been validated on real " +
+      "market data.\n\nType LIVE (uppercase) to confirm:");
+    if (t !== "LIVE") {
+      $("cfgerr").textContent = "Live trading NOT enabled — confirmation did not match.";
+      $("cfg_live").checked = false;
+      $("livebox").classList.remove("armed");
+      return;
+    }
+    body.live_confirm = t;
+  }
+  $("cfgsave").disabled = true;
+  $("cfgerr").textContent = "";
+  try {
+    const r = await api("/api/config", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    $("cfgoverlay").classList.remove("open");
+    hideBanner();
+    chartSymbol = null; chartData = null;
+    $("chart").innerHTML = ""; $("chartempty").style.display = "block";
+    $("chartempty").textContent = "Enter a symbol (or click a watchlist row) to see hourly candles, EMA 9/20, volume and the MACD histogram.";
+    $("tablewrap").style.display = "none";
+    refreshStatus(); refreshAccount(); refreshPositions(); refreshFeeds();
+  } catch (e) { $("cfgerr").textContent = e.message; }
+  $("cfgsave").disabled = false;
+}
+
+$("cfgbtn").onclick = openSettings;
+$("cfgcancel").onclick = () => $("cfgoverlay").classList.remove("open");
+$("cfgsave").onclick = saveSettings;
+$("cfg_provider").onchange = syncSections;
+$("cfg_live").onchange = () =>
+  $("livebox").classList.toggle("armed", $("cfg_live").checked);
+$("cfgoverlay").addEventListener("mousedown", e => {
+  if (e.target === $("cfgoverlay")) $("cfgoverlay").classList.remove("open");
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") $("cfgoverlay").classList.remove("open");
+});
+
+// -------------------------------------------------------------- controls --
+$("botbtn").onclick = async () => {
+  let url = running ? "/api/bot/stop" : "/api/bot/start";
+  if (!running && liveMode) {
+    const t = prompt("⚠️ LIVE trading is enabled — this bot will place REAL-MONEY " +
+                     "orders on your IBKR account.\n\nType LIVE to start it.");
+    if (t !== "LIVE") return;
+    url += "?confirm=LIVE";
+  }
+  $("botbtn").disabled = true;
+  try { await api(url, {method: "POST"}); }
+  catch (e) { showBanner(e.message); }
+  $("botbtn").disabled = false;
+  refreshStatus();
+};
+$("scanbtn").onclick = async () => {
+  $("scanbtn").disabled = true;
+  try { await api("/api/scan", {method: "POST"}); await refreshStatus(); }
+  catch (e) { showBanner(e.message); }
+  $("scanbtn").disabled = false;
+};
+$("loadbtn").onclick = () => loadChart($("symbolinput").value);
+$("symbolinput").addEventListener("keydown", e => { if (e.key === "Enter") loadChart(e.target.value); });
+window.addEventListener("resize", () => drawChart());
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawChart());
+
+refreshStatus(); refreshAccount(); refreshPositions(); refreshFeeds();
+const urlSym = new URLSearchParams(location.search).get("symbol");
+if (urlSym) loadChart(urlSym);
+setInterval(refreshStatus, 5000);
+setInterval(refreshAccount, 10000);
+setInterval(refreshPositions, 10000);
+setInterval(refreshFeeds, 5000);
+setInterval(() => { if (chartSymbol) loadChart(chartSymbol); }, 60000);
+</script>
+</body>
+</html>
