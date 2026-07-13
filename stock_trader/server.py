@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from .bot import Bot
-from .config import Settings, apply_config, public_config, save_env
+from .config import Settings, apply_config, first_run, public_config, save_env
 from .gateway import GatewayManager
 from .indicators import add_indicators
 from .telegram import maybe_start_bridge
@@ -140,6 +140,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def status() -> dict:
         clock = runner.bot.provider.now() if runner.bot else datetime.now(NY)
         out: dict = {
+            "first_run": first_run(),
             "keys_configured": runner.keys_configured,
             "running": runner.running,
             "ny_time": clock.strftime("%H:%M:%S"),

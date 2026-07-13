@@ -58,3 +58,35 @@ def test_logs_and_activity_empty_without_bot():
     c = make_client()
     assert c.get("/api/activity").json() == []
     assert c.get("/api/logs").status_code == 200
+
+
+# ------------------------------------------------------ first-run wizard --
+def test_first_run_until_env_exists(tmp_path, monkeypatch):
+    import stock_trader.config as config
+    monkeypatch.setattr(config, "ENV_PATH", str(tmp_path / ".env"))
+    client = make_client(provider="sim")
+
+    assert client.get("/api/status").json()["first_run"] is True
+
+    # finishing the wizard saves settings -> .env created, flag clears
+    r = client.post("/api/config", json={"provider": "sim", "sim_scenario": "demo"})
+    assert r.status_code == 200
+    assert (tmp_path / ".env").exists()
+    assert client.get("/api/status").json()["first_run"] is False
+
+
+def test_skipping_wizard_saves_empty_env(tmp_path, monkeypatch):
+    import stock_trader.config as config
+    monkeypatch.setattr(config, "ENV_PATH", str(tmp_path / ".env"))
+    client = make_client(provider="sim")
+
+    # the wizard's Skip link posts an empty config save
+    r = client.post("/api/config", json={})
+    assert r.status_code == 200 and r.json()["saved"] == []
+    assert (tmp_path / ".env").exists()
+    assert client.get("/api/status").json()["first_run"] is False
+
+
+def test_dashboard_contains_wizard():
+    text = make_client().get("/").text
+    assert "wzoverlay" in text and "First-time setup" in text

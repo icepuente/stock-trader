@@ -141,6 +141,30 @@ details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-
 .livebox.armed { background: color-mix(in srgb, var(--down) 16%, transparent); }
 .livebox .title { font-size: 12px; font-weight: 700; color: var(--down-text); }
 .livebox ul { margin: 6px 0 0 18px; font-size: 11px; color: var(--ink-2); }
+.wizstep, .wizsec { display: none; }
+.wizstep.show, .wizsec.show { display: block; }
+.wizhead { display: flex; align-items: center; justify-content: space-between; }
+.wizdots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--grid); margin-left: 5px; }
+.wizdots i.on { background: var(--accent); }
+.wizlead { font-size: 15px; font-weight: 650; margin-top: 12px; }
+.wiztext { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.wiztext b { color: var(--ink); }
+.modal .pcard {
+  display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  margin-top: 8px; font-size: 13px; color: var(--ink);
+}
+.modal .pcard:hover { border-color: var(--muted); }
+.modal .pcard:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.modal .pcard input { width: auto; margin: 3px 0 0; }
+.modal .pcard small { color: var(--muted); }
+.wizsummary { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.wizsummary ul { margin: 0 0 0 16px; padding: 0; }
+.wizsummary li { margin-top: 4px; }
+#wizskip { font-size: 12px; color: var(--muted); }
 .paneltitle { font-size: 10px; fill: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 </style>
 </head>
@@ -163,7 +187,8 @@ details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-
   <div class="modal">
     <h2>Settings</h2>
     <div class="hint">Saved to <code>.env</code> and applied immediately — the
-      bot is rebuilt on the new provider (and restarted if it was running).</div>
+      bot is rebuilt on the new provider (and restarted if it was running).
+      Prefer a guided walk-through? <a href="#" id="wzagain">Re-run the setup wizard</a>.</div>
 
     <label>Provider
       <select id="cfg_provider" data-k="provider">
@@ -267,6 +292,140 @@ details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-
   </div>
 </div>
 
+<div class="overlay" id="wzoverlay">
+  <div class="modal">
+    <div class="wizhead">
+      <h2 style="margin:0">First-time setup</h2>
+      <span class="wizdots" id="wizdots"></span>
+    </div>
+
+    <div class="wizstep" data-step="0">
+      <p class="wizlead">👋 Welcome to stock_trader</p>
+      <p class="wiztext">This bot watches high-volume US stocks during the New
+        York session (9:30–16:00 ET) and trades a tiered MACD/volume strategy
+        on its own — you can watch everything it does on this dashboard or
+        from Telegram.</p>
+      <p class="wiztext"><b>No real money is involved.</b> Everything here runs
+        on paper or simulated accounts. Real trading stays off unless it is
+        explicitly enabled later, behind several separate confirmations — this
+        wizard never touches it.</p>
+      <p class="wiztext">The next steps pick where the bot trades and connect
+        it — about a minute. Everything can be changed later under
+        <b>⚙ Settings</b>.</p>
+    </div>
+
+    <div class="wizstep" data-step="1">
+      <p class="wizlead">Where should the bot trade?</p>
+      <label class="pcard"><input type="radio" name="wzprov" value="sim" checked>
+        <span><b>Simulation — recommended first</b><br>
+        <small>Replays a trading day at high speed against a virtual portfolio.
+        No accounts, no keys — works immediately.</small></span></label>
+      <label class="pcard"><input type="radio" name="wzprov" value="alpaca">
+        <span><b>Alpaca — US stocks, paper account</b><br>
+        <small>Free paper-trading account with real-time market data. The best
+        way to test the strategy on live markets with fake money.</small></span></label>
+      <label class="pcard"><input type="radio" name="wzprov" value="ibkr">
+        <span><b>Interactive Brokers — US stocks, paper account</b><br>
+        <small>Uses IB Gateway on this computer, logged into an IBKR paper
+        account (DU…). Data is 15-min delayed without a paid
+        subscription.</small></span></label>
+      <label class="pcard"><input type="radio" name="wzprov" value="bitget">
+        <span><b>Bitget — crypto, demo trading</b><br>
+        <small>Simulated USDT-M futures in Bitget's demo environment.
+        Crypto trades around the clock.</small></span></label>
+    </div>
+
+    <div class="wizstep" data-step="2">
+      <div class="wizsec" data-wp="sim">
+        <p class="wizlead">Simulation</p>
+        <p class="wiztext">Nothing to sign up for — pick what kind of day to
+          replay and how fast.</p>
+        <label>Scenario
+          <select id="wz_sim_scenario" data-w="sim_scenario">
+            <option value="demo">demo — a crafted day where every stage of the strategy fires (best first look)</option>
+            <option value="replay">replay — the last real trading day (a normal day may have zero trades)</option>
+          </select>
+        </label>
+        <label>Speed (× real time) <input type="number" data-w="sim_speed" min="1" step="1"></label>
+        <div class="hint">At 60× a full trading day plays back in about 6 minutes.</div>
+      </div>
+
+      <div class="wizsec" data-wp="alpaca">
+        <p class="wizlead">Connect Alpaca</p>
+        <p class="wiztext">Sign up free at <b>alpaca.markets</b>, open the
+          <b>Paper</b> dashboard (account switcher, top-left) and generate an
+          API key pair there.</p>
+        <label>API key <input type="password" id="wz_alpaca_key" data-w="alpaca_api_key" autocomplete="off"></label>
+        <label>Secret key <input type="password" id="wz_alpaca_secret" data-w="alpaca_secret_key" autocomplete="off"></label>
+        <div class="hint">Paper keys can't touch real money. You can also leave
+          this blank and add them later under ⚙ Settings.</div>
+      </div>
+
+      <div class="wizsec" data-wp="ibkr">
+        <p class="wizlead">Connect Interactive Brokers</p>
+        <p class="wiztext">The bot talks to <b>IB Gateway</b> running on this
+          computer, logged into your <b>paper</b> account (username starts
+          with DU).</p>
+        <div class="hint" id="wzgwstatus">checking…</div>
+        <div style="display:flex; gap:8px; margin-top:6px">
+          <button type="button" id="wzgwinstall" style="display:none">Install IB Gateway</button>
+          <button type="button" id="wzgwstart" style="display:none">Start IB Gateway</button>
+        </div>
+        <div class="hint">In the gateway window pick <b>IB API</b> (not FIX
+          CTCI), log in with your paper username, then under Configure →
+          Settings → API → Settings tick <b>Enable ActiveX and Socket
+          Clients</b> and untick <b>Read-Only API</b>.</div>
+        <div class="grid2">
+          <label>Gateway host <input type="text" data-w="ibkr_host"></label>
+          <label>Port <input type="number" data-w="ibkr_port"></label>
+        </div>
+        <div class="hint">Defaults are right for IB Gateway paper (port 4002);
+          use 7497 if you run full TWS instead.</div>
+      </div>
+
+      <div class="wizsec" data-wp="bitget">
+        <p class="wizlead">Connect Bitget</p>
+        <p class="wiztext">On <b>bitget.com</b> switch to <b>Demo Trading</b>
+          mode first, then create an API key (key + secret + passphrase)
+          <b>inside</b> the demo environment.</p>
+        <label>API key <input type="password" id="wz_bg_key" data-w="bitget_api_key" autocomplete="off"></label>
+        <label>Secret key <input type="password" id="wz_bg_secret" data-w="bitget_secret_key" autocomplete="off"></label>
+        <label>Passphrase <input type="password" id="wz_bg_pass" data-w="bitget_passphrase" autocomplete="off"></label>
+        <label class="checkline"><input type="checkbox" data-w="bitget_uta"> Unified Account (UTA) mode</label>
+        <div class="hint">You can also leave this blank and add keys later
+          under ⚙ Settings.</div>
+      </div>
+    </div>
+
+    <div class="wizstep" data-step="3">
+      <p class="wizlead">Telegram notifications (optional)</p>
+      <p class="wiztext">Get a phone notification for every trade and control
+        the bot from chat (<code>/status</code>, <code>/run</code>,
+        <code>/stop</code>…).</p>
+      <p class="wiztext">In Telegram, message <b>@BotFather</b>, send
+        <code>/newbot</code>, follow the two prompts, and paste the token it
+        gives you here:</p>
+      <label>Bot token <input type="password" id="wz_tg_token" data-w="telegram_bot_token" autocomplete="off"></label>
+      <div class="hint">Leave blank to skip. After finishing, open your new bot
+        in Telegram and send <code>/start</code> to link it.</div>
+    </div>
+
+    <div class="wizstep" data-step="4">
+      <p class="wizlead">Ready to go ✅</p>
+      <div class="wizsummary" id="wizsummary"></div>
+      <p class="wiztext">Click <b>Finish setup</b>, then press
+        <b>Start bot</b> in the top-right to begin.</p>
+    </div>
+
+    <div class="actions">
+      <a href="#" id="wizskip">Skip setup</a>
+      <span class="err" id="wizerr"></span>
+      <button id="wizback" style="display:none">‹ Back</button>
+      <button id="wiznext" class="primary">Get started ›</button>
+    </div>
+  </div>
+</div>
+
 <div class="banner" id="banner"></div>
 
 <div class="tiles">
@@ -358,6 +517,7 @@ async function refreshStatus() {
     liveMode = !!s.live;
     $("modebadge").textContent = (liveMode ? "⚠ LIVE — REAL MONEY" : s.mode) + " · " + s.provider.toUpperCase();
     $("modebadge").className = "badge " + (liveMode ? "live" : "paper");
+    if (s.first_run && !wizardShown) { wizardShown = true; openWizard(true); }
     if (!s.keys_configured) {
       showBanner(s.provider + " keys not configured — open ⚙ Settings to add them (or edit .env).");
       $("botbtn").disabled = true; $("scanbtn").disabled = true;
@@ -380,8 +540,15 @@ async function refreshStatus() {
   } catch (e) { showBanner("Server unreachable: " + e.message); }
 }
 
-function showBanner(msg) { const b = $("banner"); b.textContent = msg; b.style.display = "block"; }
-function hideBanner() { $("banner").style.display = "none"; }
+let bannerHoldUntil = 0;   // sticky banners survive the next few refreshes
+function showBanner(msg, holdMs) {
+  const b = $("banner"); b.textContent = msg; b.style.display = "block";
+  bannerHoldUntil = holdMs ? Date.now() + holdMs : 0;
+}
+function hideBanner() {
+  if (Date.now() < bannerHoldUntil) return;
+  $("banner").style.display = "none";
+}
 
 function renderWatchlist(symbols, states) {
   const tb = $("watchlist").querySelector("tbody");
@@ -632,37 +799,42 @@ function syncSections() {
   if (p === "ibkr") refreshGateway();
 }
 
-async function refreshGateway() {
-  try {
-    const g = await api("/api/gateway");
-    $("gwstatus").innerHTML = g.running
-      ? '<span class="pl-up">●</span> running — API port ' + g.port + " is open"
-      : g.installing
-      ? "⏳ " + escHtml(g.install_message || "installing…")
-      : g.installed
-      ? '<span class="pl-down">●</span> installed but not running (port ' + g.port + ' closed) — start it and log in'
-      : '<span class="pl-down">●</span> not installed';
-    $("gwinstall").style.display = (!g.installed && !g.installing) ? "" : "none";
-    $("gwstart").style.display = (g.installed && !g.running) ? "" : "none";
-    if (g.installing && $("cfgoverlay").classList.contains("open"))
-      setTimeout(refreshGateway, 2500);
-  } catch (e) { $("gwstatus").textContent = "gateway status unavailable: " + e.message; }
+// One gateway status/install/start widget per overlay (settings + wizard).
+function gatewayWidget(statusId, installId, startId, overlayId) {
+  const refresh = async () => {
+    try {
+      const g = await api("/api/gateway");
+      $(statusId).innerHTML = g.running
+        ? '<span class="pl-up">●</span> running — API port ' + g.port + " is open"
+        : g.installing
+        ? "⏳ " + escHtml(g.install_message || "installing…")
+        : g.installed
+        ? '<span class="pl-down">●</span> installed but not running (port ' + g.port + ' closed) — start it and log in'
+        : '<span class="pl-down">●</span> not installed';
+      $(installId).style.display = (!g.installed && !g.installing) ? "" : "none";
+      $(startId).style.display = (g.installed && !g.running) ? "" : "none";
+      if (g.installing && $(overlayId).classList.contains("open"))
+        setTimeout(refresh, 2500);
+    } catch (e) { $(statusId).textContent = "gateway status unavailable: " + e.message; }
+  };
+  $(installId).onclick = async () => {
+    $(installId).disabled = true;
+    try { const r = await api("/api/gateway/install", {method: "POST"});
+          $(statusId).textContent = r.message; } catch (e) { $(statusId).textContent = e.message; }
+    $(installId).disabled = false;
+    setTimeout(refresh, 1500);
+  };
+  $(startId).onclick = async () => {
+    $(startId).disabled = true;
+    try { const r = await api("/api/gateway/start", {method: "POST"});
+          $(statusId).textContent = r.message; } catch (e) { $(statusId).textContent = e.message; }
+    $(startId).disabled = false;
+    setTimeout(refresh, 4000);
+  };
+  return refresh;
 }
-
-$("gwinstall").onclick = async () => {
-  $("gwinstall").disabled = true;
-  try { const r = await api("/api/gateway/install", {method: "POST"});
-        $("gwstatus").textContent = r.message; } catch (e) { $("gwstatus").textContent = e.message; }
-  $("gwinstall").disabled = false;
-  setTimeout(refreshGateway, 1500);
-};
-$("gwstart").onclick = async () => {
-  $("gwstart").disabled = true;
-  try { const r = await api("/api/gateway/start", {method: "POST"});
-        $("gwstatus").textContent = r.message; } catch (e) { $("gwstatus").textContent = e.message; }
-  $("gwstart").disabled = false;
-  setTimeout(refreshGateway, 4000);
-};
+const refreshGateway = gatewayWidget("gwstatus", "gwinstall", "gwstart", "cfgoverlay");
+const refreshWizGateway = gatewayWidget("wzgwstatus", "wzgwinstall", "wzgwstart", "wzoverlay");
 
 async function openSettings() {
   $("cfgerr").textContent = "";
@@ -736,6 +908,124 @@ $("cfgoverlay").addEventListener("mousedown", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") $("cfgoverlay").classList.remove("open");
 });
+
+// ---------------------------------------------------- first-run wizard --
+// Shown once per install (server reports first_run until a .env exists).
+// Deliberately no Escape/backdrop close — there's an explicit Skip link.
+const WIZ_STEPS = 5;
+let wizStep = 0, wizardShown = false, wizCfg = {};
+const wizProvider = () => document.querySelector("input[name=wzprov]:checked").value;
+
+function wizShow(n) {
+  wizStep = Math.max(0, Math.min(WIZ_STEPS - 1, n));
+  document.querySelectorAll(".wizstep").forEach(d =>
+    d.classList.toggle("show", +d.dataset.step === wizStep));
+  $("wizdots").innerHTML = Array.from({length: WIZ_STEPS}, (_, i) =>
+    `<i class="${i === wizStep ? "on" : ""}"></i>`).join("");
+  $("wizback").style.display = wizStep ? "" : "none";
+  $("wizskip").style.display = wizStep ? "none" : "";
+  $("wiznext").textContent =
+    ["Get started ›", "Next ›", "Next ›", "Next ›", "Finish setup"][wizStep];
+  $("wizerr").textContent = "";
+  if (wizStep === 2) {
+    const p = wizProvider();
+    document.querySelectorAll(".wizsec[data-wp]").forEach(d =>
+      d.classList.toggle("show", d.dataset.wp === p));
+    if (p === "ibkr") refreshWizGateway();
+  }
+  if (wizStep === 4) buildWizSummary();
+}
+
+async function openWizard(firstRun) {
+  try { wizCfg = await api("/api/config"); } catch (e) { wizCfg = {}; }
+  document.querySelectorAll("#wzoverlay [data-w]").forEach(el => {
+    const k = el.dataset.w;
+    if (el.type === "checkbox") el.checked = !!wizCfg[k];
+    else if (el.type === "password") {
+      el.value = "";
+      el.placeholder = wizCfg[k] ? wizCfg[k] + " (saved)" : "";
+    } else if (wizCfg[k] != null && wizCfg[k] !== "") el.value = wizCfg[k];
+  });
+  const prov = firstRun ? "sim" : (wizCfg.provider || "sim");
+  const radio = document.querySelector(`input[name=wzprov][value="${prov}"]`);
+  if (radio) radio.checked = true;
+  if (firstRun) $("wz_sim_scenario").value = "demo";  // guaranteed first-look trades
+  wizShow(0);
+  $("wzoverlay").classList.add("open");
+}
+
+function wizBody() {
+  const p = wizProvider();
+  const body = {provider: p};
+  document.querySelectorAll(`.wizsec[data-wp="${p}"] [data-w]`).forEach(el => {
+    const k = el.dataset.w;
+    if (el.type === "checkbox") body[k] = el.checked;
+    else if (el.type === "password") { if (el.value.trim()) body[k] = el.value.trim(); }
+    else if (el.value.trim() !== "") body[k] = el.value.trim();
+  });
+  const tg = $("wz_tg_token").value.trim();
+  if (tg) body.telegram_bot_token = tg;
+  return body;
+}
+
+function buildWizSummary() {
+  const p = wizProvider();
+  const names = {sim: "Simulation", alpaca: "Alpaca — US stocks, paper",
+                 ibkr: "Interactive Brokers — US stocks, paper",
+                 bitget: "Bitget — crypto demo"};
+  const set = (input, savedKey) => input.value.trim() || wizCfg[savedKey];
+  const li = [`Trading on <b>${names[p]}</b>`];
+  if (p === "sim")
+    li.push(`Scenario <b>${$("wz_sim_scenario").value}</b> — a virtual portfolio, replayed data`);
+  if (p === "alpaca")
+    li.push(set($("wz_alpaca_key"), "alpaca_api_key") && set($("wz_alpaca_secret"), "alpaca_secret_key")
+      ? "Alpaca paper keys: <b>set</b>"
+      : "⚠️ Alpaca keys <b>not set yet</b> — the bot can't start until you add them under ⚙ Settings");
+  if (p === "bitget")
+    li.push(set($("wz_bg_key"), "bitget_api_key") && set($("wz_bg_secret"), "bitget_secret_key") && set($("wz_bg_pass"), "bitget_passphrase")
+      ? "Bitget demo keys: <b>set</b>"
+      : "⚠️ Bitget keys <b>not set yet</b> — the bot can't start until you add them under ⚙ Settings");
+  if (p === "ibkr")
+    li.push("Log IB Gateway into your <b>paper</b> account (DU…) before starting the bot");
+  li.push(set($("wz_tg_token"), "telegram_bot_token")
+    ? "Telegram: <b>on</b> — open your bot and send <code>/start</code> to link it"
+    : "Telegram: skipped (add it any time under ⚙ Settings)");
+  li.push("Real-money trading: <b>OFF</b> — everything is paper/simulated");
+  $("wizsummary").innerHTML = "<ul>" + li.map(x => `<li>${x}</li>`).join("") + "</ul>";
+}
+
+async function wizFinish() {
+  $("wiznext").disabled = true;
+  $("wizerr").textContent = "";
+  try {
+    await api("/api/config", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(wizBody()),
+    });
+    $("wzoverlay").classList.remove("open");
+    showBanner("✅ Setup complete — press “Start bot” in the top-right to begin.", 15000);
+    refreshStatus(); refreshAccount(); refreshPositions(); refreshFeeds();
+  } catch (e) { $("wizerr").textContent = e.message; }
+  $("wiznext").disabled = false;
+}
+
+$("wiznext").onclick = () => wizStep === WIZ_STEPS - 1 ? wizFinish() : wizShow(wizStep + 1);
+$("wizback").onclick = () => wizShow(wizStep - 1);
+$("wizskip").onclick = async e => {
+  e.preventDefault();
+  // an empty save just creates .env, so the wizard won't reappear
+  try {
+    await api("/api/config", {method: "POST",
+      headers: {"Content-Type": "application/json"}, body: "{}"});
+  } catch (e2) {}
+  $("wzoverlay").classList.remove("open");
+};
+$("wzagain").onclick = e => {
+  e.preventDefault();
+  $("cfgoverlay").classList.remove("open");
+  openWizard(false);
+};
 
 // --------------------------------------------------------------- updates --
 async function checkUpdate() {

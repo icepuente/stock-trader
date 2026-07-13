@@ -36,9 +36,11 @@ session window — with Bitget it simply runs every day, weekends included.
      `start_bot.bat` again.
    - The first start downloads what it needs (a few minutes). After that,
      starting takes seconds.
-3. Your browser opens the dashboard at `http://127.0.0.1:8000`. Click
-   **⚙ Settings**, pick a provider (choose **Simulation** to just watch it
-   work, no accounts needed), and press **Start bot**.
+3. Your browser opens the dashboard at `http://127.0.0.1:8000`. On the very
+   first launch a **setup wizard** walks through everything: pick where the
+   bot trades (choose **Simulation** to just watch it work, no accounts
+   needed), connect the account, optionally hook up Telegram — then press
+   **Start bot**. It can be re-run any time from ⚙ Settings.
 4. Keep the black window open while using it — closing it stops the bot.
 
 Everything runs only on that computer; nothing is exposed to the internet.

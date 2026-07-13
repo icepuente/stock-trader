@@ -285,6 +285,13 @@ def apply_config(s: Settings, updates: dict) -> dict[str, str]:
     return env_updates
 
 
+def first_run() -> bool:
+    """True until a .env file exists — the dashboard shows the setup wizard
+    then. Any settings save (including the wizard's, or skipping it) creates
+    the file, so the wizard appears exactly once per install."""
+    return not Path(ENV_PATH).exists()
+
+
 def _env_quote(value: str) -> str:
     if value and not re.search(r"""[\s#"']""", value):
         return value
