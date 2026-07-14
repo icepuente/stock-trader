@@ -990,7 +990,9 @@ function buildWizSummary() {
   li.push(set($("wz_tg_token"), "telegram_bot_token")
     ? "Telegram: <b>on</b> — open your bot and send <code>/start</code> to link it"
     : "Telegram: skipped (add it any time under ⚙ Settings)");
-  li.push("Real-money trading: <b>OFF</b> — everything is paper/simulated");
+  li.push(wizCfg.live_trading
+    ? "⚠️ Real-money trading is <b>ENABLED</b> in your settings — this wizard doesn't change that. Turn it off under ⚙ Settings before starting the bot unless you mean it."
+    : "Real-money trading: <b>OFF</b> — everything is paper/simulated");
   $("wizsummary").innerHTML = "<ul>" + li.map(x => `<li>${x}</li>`).join("") + "</ul>";
 }
 
