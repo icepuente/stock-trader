@@ -1020,8 +1020,8 @@ $("wizskip").onclick = async e => {
   try {
     await api("/api/config", {method: "POST",
       headers: {"Content-Type": "application/json"}, body: "{}"});
-  } catch (e2) {}
-  $("wzoverlay").classList.remove("open");
+    $("wzoverlay").classList.remove("open");
+  } catch (e2) { $("wizerr").textContent = "Couldn't skip: " + e2.message; }
 };
 $("wzagain").onclick = e => {
   e.preventDefault();
